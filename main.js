@@ -1,44 +1,55 @@
 (function () {
-  const PANEL_ID = "shadow-custom-sim-panel";
-  const ACCESS_PASS = "1234"; // এখানে নিজের পছন্দমতো পাসওয়ার্ড বসান
+  const PANEL_ID = "custom-control-panel-root";
+  const prev = document.getElementById(PANEL_ID);
+  if (prev) prev.remove();
 
-  const existing = document.getElementById(PANEL_ID);
-  if (existing) existing.remove();
+  const CONFIG = {
+    panelTitle: "Control Panel",
+    password: "12345678",
+    demoBalance: 1000.00,
+    liveBalance: 500.00
+  };
 
   const state = {
     unlocked: false,
-    demoBalance: 1000.00,
-    liveBalance: 250.00,
-    activeView: "DEMO",
+    title: CONFIG.panelTitle,
+    activePassword: CONFIG.password,
+    demoBalance: CONFIG.demoBalance,
+    liveBalance: CONFIG.liveBalance,
+    activeMode: "DEMO",
     totalProfit: 0.00,
     totalLoss: 0.00,
-    logs: []
+    entries: []
   };
 
-  function fmt(num) {
-    const n = Number(num) || 0;
-    return "$" + n.toFixed(2);
+  function money(n) {
+    const val = Number(n) || 0;
+    return "$" + val.toFixed(2);
   }
 
-  function netPL() {
-    return state.totalProfit - state.totalLoss;
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
-  const panel = document.createElement("div");
-  panel.id = PANEL_ID;
-  panel.style.cssText = `
+  const root = document.createElement("div");
+  root.id = PANEL_ID;
+  root.style.cssText = `
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 330px;
+    width: 335px;
     max-width: 92vw;
     max-height: 86vh;
     overflow-y: auto;
-    background: #090d16;
-    color: #f8fafc;
-    border: 1px solid #00f5d4;
-    box-shadow: 0 0 24px rgba(0, 245, 212, 0.25), 0 14px 35px rgba(0, 0, 0, 0.75);
+    background: #070b14;
+    color: #f1f5f9;
+    border: 1px solid #22d3ee;
+    box-shadow: 0 0 26px rgba(34, 211, 238, 0.22), 0 16px 36px rgba(0, 0, 0, 0.8);
     border-radius: 14px;
     padding: 14px;
     font-family: system-ui, -apple-system, sans-serif;
@@ -46,179 +57,191 @@
     z-index: 2147483647;
   `;
 
-  function renderLockScreen(errorMsg) {
-    panel.innerHTML = `
+  function showLock(errorText) {
+    root.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #1e293b;margin-bottom:14px;">
-        <div style="font-weight:700;font-size:14px;color:#00f5d4;">Access Lock</div>
-        <button id="sim-close-btn" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer;">✕</button>
+        <span style="font-weight:700;font-size:14px;color:#22d3ee;">${escapeHtml(state.title)}</span>
+        <button id="cp-close" style="background:#ef4444;color:#fff;border:none;border-radius:7px;padding:4px 9px;font-weight:700;cursor:pointer;">✕</button>
       </div>
 
       <div style="text-align:center;margin-bottom:12px;">
-        <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:4px;">পাসওয়ার্ড দিন</div>
-        <div style="font-size:11px;color:#94a3b8;">প্যানেল আনলক করতে আপনার পাসওয়ার্ড লিখুন</div>
+        <div style="font-weight:600;margin-bottom:4px;">পাসওয়ার্ড দিন</div>
+        <div style="font-size:11px;color:#94a3b8;">প্যানেলটি ওপেন করতে পাসওয়ার্ড লিখুন</div>
       </div>
 
-      <input id="sim-pass-input" type="password" placeholder="Password লিখুন" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:10px;text-align:center;">
-      <button id="sim-unlock-btn" style="width:100%;padding:9px;border-radius:8px;border:none;background:#00f5d4;color:#041014;font-weight:700;cursor:pointer;">Unlock</button>
+      <input id="cp-pass-input" type="password" placeholder="Password" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:10px;text-align:center;">
+      <button id="cp-unlock" style="width:100%;padding:9px;border-radius:8px;border:none;background:#22d3ee;color:#031218;font-weight:700;cursor:pointer;">Unlock</button>
 
-      ${errorMsg ? `<div id="sim-pass-err" style="margin-top:8px;text-align:center;font-size:12px;color:#f87171;">${errorMsg}</div>` : ""}
+      ${errorText ? `<div style="margin-top:8px;text-align:center;color:#f87171;font-size:12px;">${escapeHtml(errorText)}</div>` : ""}
     `;
 
-    document.getElementById("sim-close-btn").onclick = () => panel.remove();
+    document.getElementById("cp-close").onclick = () => root.remove();
 
-    const tryUnlock = () => {
-      const val = document.getElementById("sim-pass-input").value;
-      if (val === ACCESS_PASS) {
+    const checkPass = () => {
+      const entered = document.getElementById("cp-pass-input").value;
+      if (entered === state.activePassword) {
         state.unlocked = true;
-        renderDashboard();
+        showPanel();
       } else {
-        renderLockScreen("ভুল পাসওয়ার্ড! আবার চেষ্টা করুন।");
+        showLock("পাসওয়ার্ড ভুল হয়েছে।");
       }
     };
 
-    document.getElementById("sim-unlock-btn").onclick = tryUnlock;
-    document.getElementById("sim-pass-input").onkeydown = (e) => {
-      if (e.key === "Enter") tryUnlock();
+    document.getElementById("cp-unlock").onclick = checkPass;
+    document.getElementById("cp-pass-input").onkeydown = (e) => {
+      if (e.key === "Enter") checkPass();
     };
   }
 
-  function renderDashboard() {
-    const net = netPL();
-    const currentBal = state.activeView === "DEMO" ? state.demoBalance : state.liveBalance;
+  function showPanel() {
+    const net = state.totalProfit - state.totalLoss;
+    const selectedBalance = state.activeMode === "DEMO" ? state.demoBalance : state.liveBalance;
 
-    const logHtml = state.logs.length === 0
-      ? `<div style="color:#64748b;font-size:12px;text-align:center;padding:8px 0;">এখনো কোনো প্রফিট বা লস এন্ট্রি নেই</div>`
-      : state.logs.slice().reverse().map((item) => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:5px;border-radius:8px;background:#111827;border-left:3px solid ${item.type === "WIN" ? "#22c55e" : "#ef4444"};">
+    const listHtml = state.entries.length === 0
+      ? `<div style="text-align:center;color:#64748b;font-size:12px;padding:8px 0;">কোনো এন্ট্রি নেই</div>`
+      : state.entries.slice().reverse().map((row) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:5px;border-radius:8px;background:#0f172a;border-left:3px solid ${row.kind === "PROFIT" ? "#22c55e" : "#ef4444"};">
             <div>
-              <div style="font-weight:600;font-size:12px;color:${item.type === "WIN" ? "#4ade80" : "#f87171"};">
-                ${item.type === "WIN" ? "PROFIT" : "LOSS"} (${item.mode})
-              </div>
-              <div style="font-size:11px;color:#94a3b8;">${item.time}</div>
+              <div style="font-size:12px;font-weight:700;color:${row.kind === "PROFIT" ? "#4ade80" : "#f87171"};">${row.kind} (${row.mode})</div>
+              <div style="font-size:11px;color:#94a3b8;">${row.time}</div>
             </div>
-            <div style="font-weight:700;color:${item.type === "WIN" ? "#4ade80" : "#f87171"};">
-              ${item.type === "WIN" ? "+" : "-"}${fmt(item.amount)}
+            <div style="font-weight:700;color:${row.kind === "PROFIT" ? "#4ade80" : "#f87171"};">
+              ${row.kind === "PROFIT" ? "+" : "-"}${money(row.amount)}
             </div>
           </div>
         `).join("");
 
-    panel.innerHTML = `
+    root.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #1e293b;margin-bottom:12px;">
-        <div>
-          <div style="font-weight:700;font-size:14px;color:#00f5d4;">Custom Session & Balance View</div>
-          <div style="font-size:11px;color:#94a3b8;">Local Screen Simulation Only</div>
-        </div>
-        <button id="sim-close-btn" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer;">✕</button>
+        <span style="font-weight:700;font-size:14px;color:#22d3ee;">${escapeHtml(state.title)}</span>
+        <button id="cp-close" style="background:#ef4444;color:#fff;border:none;border-radius:7px;padding:4px 9px;font-weight:700;cursor:pointer;">✕</button>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div id="card-demo" style="padding:10px;border-radius:10px;cursor:pointer;background:${state.activeView === "DEMO" ? "#0f292e" : "#111827"};border:1px solid ${state.activeView === "DEMO" ? "#00f5d4" : "#1e293b"};">
-          <div style="font-size:11px;color:#94a3b8;">DEMO DISPLAY</div>
-          <div style="font-size:16px;font-weight:700;margin-top:3px;color:#f8fafc;">${fmt(state.demoBalance)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div id="mode-demo" style="padding:10px;border-radius:10px;cursor:pointer;background:${state.activeMode === "DEMO" ? "#0e2938" : "#0f172a"};border:1px solid ${state.activeMode === "DEMO" ? "#22d3ee" : "#1e293b"};">
+          <div style="font-size:11px;color:#94a3b8;">DEMO</div>
+          <div style="font-size:16px;font-weight:700;margin-top:3px;">${money(state.demoBalance)}</div>
         </div>
-        <div id="card-live" style="padding:10px;border-radius:10px;cursor:pointer;background:${state.activeView === "LIVE" ? "#1e1b4b" : "#111827"};border:1px solid ${state.activeView === "LIVE" ? "#a855f7" : "#1e293b"};">
-          <div style="font-size:11px;color:#94a3b8;">LIVE DISPLAY</div>
-          <div style="font-size:16px;font-weight:700;margin-top:3px;color:#f8fafc;">${fmt(state.liveBalance)}</div>
+        <div id="mode-live" style="padding:10px;border-radius:10px;cursor:pointer;background:${state.activeMode === "LIVE" ? "#251846" : "#0f172a"};border:1px solid ${state.activeMode === "LIVE" ? "#c084fc" : "#1e293b"};">
+          <div style="font-size:11px;color:#94a3b8;">LIVE</div>
+          <div style="font-size:16px;font-weight:700;margin-top:3px;">${money(state.liveBalance)}</div>
         </div>
       </div>
 
-      <button id="sim-swap-btn" style="width:100%;padding:7px;margin-bottom:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-weight:600;cursor:pointer;">
-        ⇄ Swap Demo & Live Balance Display
+      <button id="cp-swap" style="width:100%;padding:7px;margin-bottom:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#f8fafc;font-weight:600;cursor:pointer;">
+        ⇄ Swap DEMO & LIVE Balance
       </button>
 
-      <div style="background:#111827;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#cbd5e1;">Customize Balance (${state.activeView})</div>
+      <div style="background:#0f172a;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#cbd5e1;">Set ${state.activeMode} Balance ($)</div>
         <div style="display:flex;gap:6px;">
-          <input id="sim-custom-bal" type="number" step="0.01" value="${currentBal.toFixed(2)}" style="flex:1;padding:7px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;">
-          <button id="sim-save-bal" style="padding:7px 12px;border-radius:8px;border:none;background:#00f5d4;color:#041014;font-weight:700;cursor:pointer;">Apply</button>
+          <input id="cp-bal-input" type="number" step="0.01" value="${selectedBalance.toFixed(2)}" style="flex:1;padding:7px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;">
+          <button id="cp-bal-save" style="padding:7px 12px;border-radius:8px;border:none;background:#22d3ee;color:#031218;font-weight:700;cursor:pointer;">Save</button>
         </div>
       </div>
 
-      <div style="background:#111827;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#cbd5e1;">Add Profit / Loss ($)</div>
-        <input id="sim-trade-amt" type="number" step="0.01" value="25.00" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:8px;">
+      <div style="background:#0f172a;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#cbd5e1;">Profit / Loss Entry ($)</div>
+        <input id="cp-pl-input" type="number" step="0.01" value="50.00" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:8px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button id="sim-add-win" style="padding:8px;border-radius:8px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">+ Profit</button>
-          <button id="sim-add-loss" style="padding:8px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">- Loss</button>
+          <button id="cp-win" style="padding:8px;border-radius:8px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">+ Profit</button>
+          <button id="cp-loss" style="padding:8px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">- Loss</button>
         </div>
       </div>
 
-      <div style="background:#111827;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:10px;">
+      <div style="background:#0f172a;padding:10px;border-radius:10px;border:1px solid #1e293b;margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-weight:700;font-size:12px;color:#00f5d4;">Session Leaderboard / Summary</span>
-          <button id="sim-reset-btn" style="background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;">Reset</button>
+          <span style="font-weight:700;font-size:12px;color:#22d3ee;">Leaderboard / Session Summary</span>
+          <button id="cp-clear" style="background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;">Clear</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center;margin-bottom:10px;">
           <div style="background:#020617;padding:6px;border-radius:8px;">
             <div style="font-size:10px;color:#94a3b8;">PROFIT</div>
-            <div style="font-weight:700;color:#4ade80;font-size:12px;">+${fmt(state.totalProfit)}</div>
+            <div style="font-weight:700;color:#4ade80;font-size:12px;">+${money(state.totalProfit)}</div>
           </div>
           <div style="background:#020617;padding:6px;border-radius:8px;">
             <div style="font-size:10px;color:#94a3b8;">LOSS</div>
-            <div style="font-weight:700;color:#f87171;font-size:12px;">-${fmt(state.totalLoss)}</div>
+            <div style="font-weight:700;color:#f87171;font-size:12px;">-${money(state.totalLoss)}</div>
           </div>
           <div style="background:#020617;padding:6px;border-radius:8px;">
-            <div style="font-size:10px;color:#94a3b8;">NET P/L</div>
+            <div style="font-size:10px;color:#94a3b8;">NET</div>
             <div style="font-weight:700;color:${net >= 0 ? "#4ade80" : "#f87171"};font-size:12px;">
-              ${net >= 0 ? "+" : "-"}${fmt(Math.abs(net))}
+              ${net >= 0 ? "+" : "-"}${money(Math.abs(net))}
             </div>
           </div>
         </div>
         <div style="max-height:130px;overflow-y:auto;">
-          ${logHtml}
+          ${listHtml}
+        </div>
+      </div>
+
+      <div style="background:#0f172a;padding:10px;border-radius:10px;border:1px solid #1e293b;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#cbd5e1;">Customize Panel Title & Password</div>
+        <input id="cp-title-input" type="text" value="${escapeHtml(state.title)}" placeholder="Panel Title" style="width:100%;box-sizing:border-box;padding:6px;border-radius:7px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:6px;">
+        <div style="display:flex;gap:6px;">
+          <input id="cp-newpass-input" type="text" value="${escapeHtml(state.activePassword)}" placeholder="New Password" style="flex:1;padding:6px;border-radius:7px;border:1px solid #334155;background:#020617;color:#fff;">
+          <button id="cp-meta-save" style="padding:6px 12px;border-radius:7px;border:none;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer;">Update</button>
         </div>
       </div>
     `;
 
-    document.getElementById("sim-close-btn").onclick = () => panel.remove();
-    document.getElementById("card-demo").onclick = () => { state.activeView = "DEMO"; renderDashboard(); };
-    document.getElementById("card-live").onclick = () => { state.activeView = "LIVE"; renderDashboard(); };
+    document.getElementById("cp-close").onclick = () => root.remove();
+    document.getElementById("mode-demo").onclick = () => { state.activeMode = "DEMO"; showPanel(); };
+    document.getElementById("mode-live").onclick = () => { state.activeMode = "LIVE"; showPanel(); };
 
-    document.getElementById("sim-swap-btn").onclick = () => {
-      const temp = state.demoBalance;
+    document.getElementById("cp-swap").onclick = () => {
+      const tmp = state.demoBalance;
       state.demoBalance = state.liveBalance;
-      state.liveBalance = temp;
-      renderDashboard();
+      state.liveBalance = tmp;
+      showPanel();
     };
 
-    document.getElementById("sim-save-bal").onclick = () => {
-      const val = parseFloat(document.getElementById("sim-custom-bal").value);
+    document.getElementById("cp-bal-save").onclick = () => {
+      const val = parseFloat(document.getElementById("cp-bal-input").value);
       if (isNaN(val)) return;
-      if (state.activeView === "DEMO") state.demoBalance = val;
+      if (state.activeMode === "DEMO") state.demoBalance = val;
       else state.liveBalance = val;
-      renderDashboard();
+      showPanel();
     };
 
-    function applyResult(type) {
-      const amt = parseFloat(document.getElementById("sim-trade-amt").value);
+    function recordEntry(kind) {
+      const amt = parseFloat(document.getElementById("cp-pl-input").value);
       if (isNaN(amt) || amt <= 0) return;
 
-      if (type === "WIN") {
+      if (kind === "PROFIT") {
         state.totalProfit += amt;
-        if (state.activeView === "DEMO") state.demoBalance += amt;
+        if (state.activeMode === "DEMO") state.demoBalance += amt;
         else state.liveBalance += amt;
       } else {
         state.totalLoss += amt;
-        if (state.activeView === "DEMO") state.demoBalance -= amt;
+        if (state.activeMode === "DEMO") state.demoBalance -= amt;
         else state.liveBalance -= amt;
       }
 
-      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      state.logs.push({ type, amount: amt, mode: state.activeView, time: now });
-      renderDashboard();
+      const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      state.entries.push({ kind, amount: amt, mode: state.activeMode, time });
+      showPanel();
     }
 
-    document.getElementById("sim-add-win").onclick = () => applyResult("WIN");
-    document.getElementById("sim-add-loss").onclick = () => applyResult("LOSS");
+    document.getElementById("cp-win").onclick = () => recordEntry("PROFIT");
+    document.getElementById("cp-loss").onclick = () => recordEntry("LOSS");
 
-    document.getElementById("sim-reset-btn").onclick = () => {
+    document.getElementById("cp-clear").onclick = () => {
       state.totalProfit = 0;
       state.totalLoss = 0;
-      state.logs = [];
-      renderDashboard();
+      state.entries = [];
+      showPanel();
+    };
+
+    document.getElementById("cp-meta-save").onclick = () => {
+      const nextTitle = document.getElementById("cp-title-input").value.trim();
+      const nextPass = document.getElementById("cp-newpass-input").value;
+      if (nextTitle) state.title = nextTitle;
+      if (nextPass.length > 0) state.activePassword = nextPass;
+      showPanel();
     };
   }
 
-  document.body.appendChild(panel);
-  renderLockScreen("");
+  document.body.appendChild(root);
+  showLock("");
 })();
