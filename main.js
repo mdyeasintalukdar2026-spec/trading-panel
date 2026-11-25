@@ -1,12 +1,15 @@
 (function () {
   const PANEL_ID = "shadow-custom-sim-panel";
+  const ACCESS_PASS = "1234"; // এখানে নিজের পছন্দমতো পাসওয়ার্ড বসান
+
   const existing = document.getElementById(PANEL_ID);
   if (existing) existing.remove();
 
   const state = {
+    unlocked: false,
     demoBalance: 1000.00,
     liveBalance: 250.00,
-    activeView: "DEMO", // "DEMO" or "LIVE"
+    activeView: "DEMO",
     totalProfit: 0.00,
     totalLoss: 0.00,
     logs: []
@@ -43,13 +46,49 @@
     z-index: 2147483647;
   `;
 
-  function render() {
+  function renderLockScreen(errorMsg) {
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #1e293b;margin-bottom:14px;">
+        <div style="font-weight:700;font-size:14px;color:#00f5d4;">Access Lock</div>
+        <button id="sim-close-btn" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer;">✕</button>
+      </div>
+
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:4px;">পাসওয়ার্ড দিন</div>
+        <div style="font-size:11px;color:#94a3b8;">প্যানেল আনলক করতে আপনার পাসওয়ার্ড লিখুন</div>
+      </div>
+
+      <input id="sim-pass-input" type="password" placeholder="Password লিখুন" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #334155;background:#020617;color:#fff;margin-bottom:10px;text-align:center;">
+      <button id="sim-unlock-btn" style="width:100%;padding:9px;border-radius:8px;border:none;background:#00f5d4;color:#041014;font-weight:700;cursor:pointer;">Unlock</button>
+
+      ${errorMsg ? `<div id="sim-pass-err" style="margin-top:8px;text-align:center;font-size:12px;color:#f87171;">${errorMsg}</div>` : ""}
+    `;
+
+    document.getElementById("sim-close-btn").onclick = () => panel.remove();
+
+    const tryUnlock = () => {
+      const val = document.getElementById("sim-pass-input").value;
+      if (val === ACCESS_PASS) {
+        state.unlocked = true;
+        renderDashboard();
+      } else {
+        renderLockScreen("ভুল পাসওয়ার্ড! আবার চেষ্টা করুন।");
+      }
+    };
+
+    document.getElementById("sim-unlock-btn").onclick = tryUnlock;
+    document.getElementById("sim-pass-input").onkeydown = (e) => {
+      if (e.key === "Enter") tryUnlock();
+    };
+  }
+
+  function renderDashboard() {
     const net = netPL();
     const currentBal = state.activeView === "DEMO" ? state.demoBalance : state.liveBalance;
 
     const logHtml = state.logs.length === 0
       ? `<div style="color:#64748b;font-size:12px;text-align:center;padding:8px 0;">এখনো কোনো প্রফিট বা লস এন্ট্রি নেই</div>`
-      : state.logs.slice().reverse().map((item, idx) => `
+      : state.logs.slice().reverse().map((item) => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:5px;border-radius:8px;background:#111827;border-left:3px solid ${item.type === "WIN" ? "#22c55e" : "#ef4444"};">
             <div>
               <div style="font-weight:600;font-size:12px;color:${item.type === "WIN" ? "#4ade80" : "#f87171"};">
@@ -132,14 +171,14 @@
     `;
 
     document.getElementById("sim-close-btn").onclick = () => panel.remove();
-    document.getElementById("card-demo").onclick = () => { state.activeView = "DEMO"; render(); };
-    document.getElementById("card-live").onclick = () => { state.activeView = "LIVE"; render(); };
+    document.getElementById("card-demo").onclick = () => { state.activeView = "DEMO"; renderDashboard(); };
+    document.getElementById("card-live").onclick = () => { state.activeView = "LIVE"; renderDashboard(); };
 
     document.getElementById("sim-swap-btn").onclick = () => {
       const temp = state.demoBalance;
       state.demoBalance = state.liveBalance;
       state.liveBalance = temp;
-      render();
+      renderDashboard();
     };
 
     document.getElementById("sim-save-bal").onclick = () => {
@@ -147,7 +186,7 @@
       if (isNaN(val)) return;
       if (state.activeView === "DEMO") state.demoBalance = val;
       else state.liveBalance = val;
-      render();
+      renderDashboard();
     };
 
     function applyResult(type) {
@@ -166,7 +205,7 @@
 
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       state.logs.push({ type, amount: amt, mode: state.activeView, time: now });
-      render();
+      renderDashboard();
     }
 
     document.getElementById("sim-add-win").onclick = () => applyResult("WIN");
@@ -176,10 +215,10 @@
       state.totalProfit = 0;
       state.totalLoss = 0;
       state.logs = [];
-      render();
+      renderDashboard();
     };
   }
 
   document.body.appendChild(panel);
-  render();
+  renderLockScreen("");
 })();
